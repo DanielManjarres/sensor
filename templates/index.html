@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualización Sensor</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f7fc;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            height: 100vh;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .contexto {
+            font-size: 16px;
+            color: #555;
+            margin-bottom: 20px;
+            text-align: center;
+            max-width: 800px;
+        }
+
+        form {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 300px;
+            margin-bottom: 30px;
+        }
+
+        label {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        input[type="text"], input[type="date"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #grafico-container {
+            margin-top: 30px;
+            width: 80%;
+            max-width: 700px;
+        }
+
+        table {
+            width: 80%;
+            max-width: 800px;
+            margin-top: 30px;
+            border-collapse: collapse;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: center;
+        }
+
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        td {
+            font-size: 14px;
+            color: #555;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        tr:hover {
+            background-color: #ddd;
+        }
+    </style>
+</head>
+<body>
+    <h1>Visualización de Datos del Sensor</h1>
+
+    <div class="contexto">
+        <p>Esta página permite visualizar los datos obtenidos de un sensor que mide la distancia en un parqueadero.
+        El sensor comienza en una distancia de 5 metros y disminuye hasta 0.2 metros.
+        Los datos mostrados incluyen el valor de distancia, la hora de la medición y la fecha en que se obtuvo la información.
+        Puedes consultar los datos del sensor y visualizar su comportamiento a lo largo del tiempo mediante gráficos.</p>
+    </div>
+
+    <form id="sensorForm">
+        <label for="idSensor">ID Sensor:</label>
+        <input type="text" id="idSensor" name="idSensor" placeholder="Ingrese el ID del sensor" required>
+
+        <label for="fecha">Fecha:</label>
+        <input type="date" id="fecha" name="fecha" required>
+
+        <button type="submit">Consultar Datos</button>
+    </form>
+
+    <div id="grafico-container">
+        <h2>Gráfico de Datos</h2>
+        <canvas id="grafico"></canvas>
+    </div>
+
+    <h2>Datos del Sensor</h2>
+    <table id="tablaDatos">
+        <thead>
+            <tr>
+                <th>ID Sensor</th>
+                <th>Fecha</th>
+                <th>Hora</th>
+                <th>Valor</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        document.getElementById('sensorForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            let idSensor = document.getElementById('idSensor').value;
+            let fecha = document.getElementById('fecha').value;
+
+            // Realizar la consulta a la API para obtener los datos
+            fetch(`/api/datos/${idSensor}?fecha=${fecha}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                        return;
+                    }
+
+                    // Mostrar los datos en la tabla
+                    let table = document.getElementById('tablaDatos').getElementsByTagName('tbody')[0];
+                    table.innerHTML = '';  // Limpiar la tabla antes de agregar nuevos datos
+                    data.forEach(item => {
+                        let row = table.insertRow();
+                        row.insertCell(0).textContent = item.id;
+                        row.insertCell(1).textContent = item.fecha;
+                        row.insertCell(2).textContent = item.hora;
+                        row.insertCell(3).textContent = item.valor;
+                    });
+
+                    // Mostrar los datos en un gráfico de línea
+                    let ctx = document.getElementById('grafico').getContext('2d');
+
+                    // Destruir el gráfico anterior si existe
+                    if (window.chartInstance) {
+                        window.chartInstance.destroy();
+                    }
+
+                    // Crear los datos para el gráfico
+                    let chartData = {
+                        labels: data.map(item => item.hora),
+                        datasets: [{
+                            label: 'Valor del Sensor (m)',
+                            data: data.map(item => item.valor),
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    };
+
+                    // Crear el gráfico
+                    window.chartInstance = new Chart(ctx, {
+                        type: 'line',
+                        data: chartData,
+                        options: {
+                            responsive: true,
+                            scales: {
+                                x: {
+                                    title: {
+                                        display: true,
+                                        text: 'Hora'
+                                    }
+                                },
+                                y: {
+                                    title: {
+                                        display: true,
+                                        text: 'Distancia (m)'
+                                    }
+                                }
+                            }
+                        }
+                    });
+                })
+                .catch(error => alert('Error al obtener los datos: ' + error));
+        });
+    </script>
+</body>
+</html>
